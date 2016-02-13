@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+
+# These crucial variables are passed in as arguments. We need to export them if
+# we want them to be available in subprocesses.
+export BUILD_DIR=$1 CACHE_DIR=$2 ENV_DIR=$3
+
+DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
+source $DIR/common
+
+# Heroku provides environment variables as files so we can be selective about
+# what we expose and what we hide. Export the ones we need using a helper
+# function.
+export_env_dir $ENV_DIR
+
+# We need proot for working with Nix and AWS for caching/restoring our Nix
+# binaries.
+mkdir -p $CACHE_DIR/bin
+download_and_install $CACHE_DIR $BUILD_DIR proot http://static.proot.me/proot-x86_64
+download_and_install $CACHE_DIR $BUILD_DIR aws https://raw.githubusercontent.com/timkay/aws/master/aws
+
+# Check if we've got a cached copy of Nix and download it if we don't
+if [ -d "$NIX_ROOT_CACHE_PATH" ]; then
+  topic "nix $NIX_VERSION found in cache"
+else
+  topic "Downloading nix $NIX_VERSION to cache"
+
+  mkdir -p $CACHE_DIR/nix-mnt
+  cd $CACHE_DIR/nix-mnt
+  fetch $NIX_TARBALL $NIX_URL
+  tar xjf $NIX_TARBALL
+  echo "Done extracting." | indent
+  rm $NIX_TARBALL
+fi
+
+topic "Copying nix to $NIX_ROOT_PATH"
+mkdir -p $NIX_ROOT_PATH
+rsync -a $NIX_ROOT_CACHE_PATH/ $NIX_ROOT_PATH
+
+# Install Nix
+$BUILD_DIR/bin/proot -b $NIX_ROOT_PATH:/nix $DIR/setup-nix
+
+# TODO build instead if we have NIX_BUILD_ON_PUSH
+# Attempt to restore the project from the stored closure (if present)
+$BUILD_DIR/bin/proot -b $NIX_ROOT_PATH:/nix $DIR/restore-from-closure
+
+# COPY TO NIX_DIR
+
+if [ -z "${NIX_BUILD_ON_PUSH:-}" ] && [ ! -e /tmp/closure.log ]; then
+  topic "Build environment set up."
+  echo "To finish building, run:" | indent
+  echo "$ heroku run --size=PX build" | indent
+  echo
+  echo "Then complete the deploy with:" | indent
+  echo "$ git commit --amend --no-edit" | indent
+  echo "$ git push -f heroku master" | indent
+fi
+
+topic "Make sure your Procfile includes run_proot.sh,"
+echo "like so:" | indent
+echo "web: run_proot.sh myapp -p \$PORT" | indent

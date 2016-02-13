@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+
+DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
+source $DIR/common
+
+# Heroku provides environment variables as files so we can be selective about
+# what we expose and what we hide. Export the ones we need using a helper
+# function.
+export_env_dir $ENV_DIR
+
+# Make sure Nix installs things to the right place since we don't exactly have
+# a real HOME
+export HOME=$NIX_MNT
+source $HOME/.nix-profile/etc/profile.d/nix.sh
+export PATH=$HOME/.nix-profile/bin:$PATH
+
+topic "Downloading closure"
+try_download_closure
+
+if [ ! -e $CLOSURE ]; then
+  topic "Closure not found; skipping"
+else
+  topic "Closure found; importing"
+  nix-store --import < $CLOSURE | tee /tmp/closure.log | indent
+  # Get the result path of the primary derivation for the app. If my theory is
+  # correct, it will always be the last thing to be imported since it's at the
+  # base of the dependency tree, but without confirmation from the Nix team this
+  # is hacky and brittle.
+  # TODO either confirm this is correct or find a better way
+  out=$(tail -1 /tmp/closure.log)
+
+  topic "Project restored from previous build to $out"
+  echo "Symlinking to result/" | indent
+  # Symlink to the built project so it can be referenced from the Procfile
+  ln -s $out $BUILD_DIR/result
+
+  # Clear out any packages Nix has kept that aren't required by our package
+  topic "Clearing other packages"
+  rm -rf /nix/var/nix/gcroots/*
+  ln -s $out /nix/var/nix/gcroots/$(basename $out)
+  nix-collect-garbage --option gc-keep-derivations false -d >/dev/null 2>&1
+
+  # Copy all our Nix stuff (including the store) to BUILD_DIR so it can be
+  # accessed by the running app.
+  topic "Copying Nix to BUILD_DIR, excluding patterns in .slugexclude"
+  mkdir -p $BUILD_DIR/nix-mnt
+  # Make sure the rsync exclude file at least exists or we'll get errors
+  touch $BUILD_DIR/.slugexclude
+  # Then copy everything over, minus the exclude patterns from .slugexclude
+  rsync -a --exclude-from=$BUILD_DIR/.slugexclude $NIX_MNT/ $BUILD_DIR/nix-mnt
+
+fi

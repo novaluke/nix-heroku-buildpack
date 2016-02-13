@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+
+BUILD_DIR=$1
+
+# Require a default.nix file
+if [ -f $BUILD_DIR/default.nix ]; then
+  echo "Nix"
+  exit 0
+else
+  exit 1
+fi

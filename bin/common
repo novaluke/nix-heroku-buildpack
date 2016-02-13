@@ -1,0 +1,109 @@
+#!/usr/bin/env bash
+
+trap 'err_handler $?' ERR
+
+err_handler() {
+  trap - ERR
+  let i=0 exit_status=$1
+  echo "Aborting on error $exit_status:"
+  echo "--------------------"
+  while caller $i; do ((i++)); done
+  exit $exit_status
+}
+
+topic() {
+  echo "-----> $*"
+}
+
+indent() {
+  sed -u 's/^/       /'
+}
+
+fetch() {
+  curl -sSfL -o "$1" "$2"
+}
+
+download_and_install() {
+  CACHE_DIR="$1"
+  BUILD_DIR="$2"
+  if [ -x "$CACHE_DIR/bin/$3" ]; then
+    topic "$3 found in cache"
+  else
+    topic "Downloading $3"
+    mkdir -p $CACHE_DIR/bin
+    cd $CACHE_DIR/bin
+    fetch $3 $4
+    chmod u+x $3
+  fi
+  # Add to BUILD_DIR as well as CACHE_DIR so that we can use run_proot etc.
+  # after build to run the app
+  mkdir -p $BUILD_DIR/bin
+  cp -f $CACHE_DIR/bin/$3 $BUILD_DIR/bin/$3
+}
+
+export_env_dir() {
+  env_dir=$1
+  whitelist_regex=${2:-''}
+  blacklist_regex=${3:-'^(PATH|GIT_DIR|CPATH|CPPATH|LD_PRELOAD|LIBRARY_PATH)$'}
+  if [ -d "$env_dir" ]; then
+    for e in $(ls $env_dir); do
+      echo "$e" | grep -E "$whitelist_regex" | grep -qvE "$blacklist_regex" &&
+      export "$e=$(cat $env_dir/$e)"
+      :
+    done
+  fi
+  ## Check that required variables have been set
+  : "${NIX_S3_KEY:?must be set to your AWS access key}"
+  : "${NIX_S3_SECRET:?must be set to your AWS secret key}"
+  : "${NIX_S3_BUCKET:?must be set}"
+  : "${APP_NAME:?must be set - determines name of closure file}"
+  # TODO add warning if NIX_VERSION is not set
+  ## Add our own variables
+  # Default the Nix version to 1.10 unless one has been specified
+  export NIX_VERSION=${NIX_VERSION:-1.10}
+  export NIX_VERSION_FULL=nix-$NIX_VERSION-x86_64-linux
+  # Explain
+  export NIX_MNT=/tmp/nix-mnt
+  # Explain
+  export NIX_ROOT_PATH=$NIX_MNT/$NIX_VERSION_FULL
+  # Where we'll cache Nix to be used in subsequent builds
+  export NIX_ROOT_CACHE_PATH=$CACHE_DIR/nix-mnt/$NIX_VERSION_FULL
+  # Name of the Nix installation tarball file for our version
+  export NIX_TARBALL=${NIX_VERSION_FULL}.tar.bz2
+  # Location where the Nix installation tarball can be downloaded
+  export NIX_URL=https://nixos.org/releases/nix/nix-${NIX_VERSION}/${NIX_TARBALL}
+  # Nix installation script needs this
+  export USER=$(whoami)
+  export CLOSURE_NAME=${APP_NAME}.closure
+  export CLOSURE=/tmp/$CLOSURE_NAME
+}
+
+try_download_closure() {
+  #check_for_s3
+  export EC2_ACCESS_KEY=$NIX_S3_KEY
+  export EC2_SECRET_KEY=$NIX_S3_SECRET
+
+  set +e
+  $BUILD_DIR/bin/aws get $NIX_S3_BUCKET/nix-closures/$CLOSURE_NAME $CLOSURE 2>&1| indent
+  set -e
+}
+
+upload_closure() {
+  #check_for_s3
+  export EC2_ACCESS_KEY=$NIX_S3_KEY
+  export EC2_SECRET_KEY=$NIX_S3_SECRET
+
+  $BUILD_DIR/bin/aws put $NIX_S3_BUCKET/nix-closures/$CLOSURE_NAME $CLOSURE 2>&1| indent
+}
+
+install_nix() {
+  #copy_custom_nix_config
+
+  if [ ! -e $HOME/.nix-defexpr/channels/nixpkgs ]; then
+    cd $NIX_ROOT_PATH
+    topic "Installing nix $NIX_VERSION"
+    ./install 2>&1| indent
+  else
+    topic "Nix found"
+  fi
+}
