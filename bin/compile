@@ -60,7 +60,8 @@ mkdir -p $BUILD_DIR/nix-mnt
 # Make sure the rsync exclude file at least exists or we'll get errors
 touch $BUILD_DIR/.slugexclude
 # Then copy everything over, minus the exclude patterns from .slugexclude
-rsync -a --exclude-from=$BUILD_DIR/.slugexclude $NIX_MNT/ $BUILD_DIR/nix-mnt
+rsync -a --exclude-from=$BUILD_DIR/.slugexclude --prune-empty-dirs \
+  $NIX_MNT/ $BUILD_DIR/nix-mnt
 
 # Final instructions for the user
 if [ -z "${NIX_BUILD_ON_PUSH:-}" ] && [ ! -e /tmp/closure.log ]; then
