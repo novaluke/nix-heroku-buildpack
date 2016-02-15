@@ -105,7 +105,7 @@ install_nix() {
   if [ ! -e $HOME/.nix-defexpr/channels/nixpkgs ]; then
     cd $NIX_ROOT_PATH
     topic "Installing nix $NIX_VERSION"
-    /app/bin/proot -b $NIX_ROOT_PATH:/nix ./install 2>&1| indent
+    $BUILD_DIR/bin/proot -b $NIX_ROOT_PATH:/nix ./install 2>&1| indent
   else
     topic "Nix found"
   fi

@@ -29,7 +29,7 @@ if [ -z "$BUILD_DIR" ]; then
   try_download_closure
 fi
 
-/app/bin/proot -b /tmp/nix-mnt/$NIX_VERSION_FULL:/nix /app/bin/build-internal
+$BUILD_DIR/bin/proot -b $NIX_ROOT_PATH:/nix $BUILD_DIR/bin/build-internal
 
 topic "Uploading closure to S3"
 upload_closure
