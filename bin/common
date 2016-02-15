@@ -64,6 +64,9 @@ export_env_dir() {
   export NIX_VERSION_FULL=nix-$NIX_VERSION-x86_64-linux
   # Explain
   export NIX_MNT=/tmp/nix-mnt
+  # Nix will store various things in HOME, but we don't have one on Heroku so we
+  # need to manually specify one.
+  export HOME=$NIX_MNT
   # Explain
   export NIX_ROOT_PATH=$NIX_MNT/$NIX_VERSION_FULL
   # Where we'll cache Nix to be used in subsequent builds
@@ -97,12 +100,11 @@ upload_closure() {
 }
 
 install_nix() {
-  #copy_custom_nix_config
 
   if [ ! -e $HOME/.nix-defexpr/channels/nixpkgs ]; then
     cd $NIX_ROOT_PATH
     topic "Installing nix $NIX_VERSION"
-    ./install 2>&1| indent
+    /app/bin/proot -b $NIX_ROOT_PATH:/nix ./install 2>&1| indent
   else
     topic "Nix found"
   fi

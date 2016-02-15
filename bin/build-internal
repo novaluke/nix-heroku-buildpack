@@ -2,32 +2,9 @@
 
 DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 source $DIR/common
-
-# Heroku provides environment variables as files so we can be selective about
-# what we expose and what we hide. Export the ones we need using a helper
-# function.
-export_env_dir $ENV_DIR
-
-export HOME=$NIX_MNT # So Nix knows where to find/put things
-if [ -z "$BUILD_DIR" ]; then # We are in a one-off dyno - must work in /tmp
-  export BUILD_DIR=/app
-  #mkdir -p $NIX_ROOT_PATH # Make our temporary directories
-  #rsync -a $BUILD_DIR/nix-mnt /tmp # Copy cached Nix stuff over
-  mkdir -p $NIX_MNT
-  cd $NIX_MNT
-  fetch $NIX_TARBALL $NIX_URL
-  tar xjf $NIX_TARBALL
-  echo "Done extracting." | indent
-  rm $NIX_TARBALL
-  # Install Nix
-  install_nix
-fi
-
+# Hook up Nix
 source $HOME/.nix-profile/etc/profile.d/nix.sh
 export PATH=$HOME/.nix-profile/bin:$PATH
-
-topic "Attempting to download closure"
-try_download_closure
 
 if [ -e $CLOSURE ]; then
   topic "Closure found; importing."
@@ -39,8 +16,6 @@ nix-build --cores 0 $NIX_BUILD_FLAGS -o $BUILD_DIR/result $BUILD_DIR/default.nix
 
 topic "Storing application closure"
 nix-store -qR $BUILD_DIR/result > /tmp/closure.log
+# TODO figure out if swapping things around is important, or if we can simplify
 #swap stdout/stderr so the closure goes to stderr and stderr to stdout
 (nix-store --export $(cat /tmp/closure.log) 3>&1 1>&2- 2>&3-) 2> $CLOSURE | indent
-
-topic "Uploading closure to S3"
-upload_closure

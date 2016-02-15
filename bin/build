@@ -3,10 +3,34 @@
 DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 source $DIR/common
 
-# Heroku provides environment variables as files so we can be selective about
-# what we expose and what we hide. Export the ones we need using a helper
-# function.
-export_env_dir $ENV_DIR
+# If BUILD_DIR is not set then we're not running through the compile script
+# since it's the only one with access to the BUILD_DIR. This means we're in a
+# one-off repo and we haven't had any initialization done yet so we have to do
+# it ourselves.
+if [ -z "$BUILD_DIR" ]; then
+  export BUILD_DIR=/app
+  # Heroku provides environment variables as files so we can be selective about
+  # what we expose and what we hide. Export the ones we need using a helper
+  # function.
+  export_env_dir $ENV_DIR
 
-mkdir -p /tmp/nix-mnt/$NIX_VERSION_FULL
+  # Can't restore from cache since we can't access cache in one-off repo
+  topic "Downloading Nix"
+  mkdir -p $NIX_MNT
+  cd $NIX_MNT
+  fetch $NIX_TARBALL $NIX_URL
+  tar xjf $NIX_TARBALL
+  echo "Done extracting." | indent
+  rm $NIX_TARBALL
+
+  # Install Nix
+  install_nix
+
+  topic "Attempting to download closure"
+  try_download_closure
+fi
+
 /app/bin/proot -b /tmp/nix-mnt/$NIX_VERSION_FULL:/nix /app/bin/build-internal
+
+topic "Uploading closure to S3"
+upload_closure
