@@ -56,7 +56,7 @@ setup_variables() {
   : "${NIX_S3_KEY:?must be set to your AWS access key}"
   : "${NIX_S3_SECRET:?must be set to your AWS secret key}"
   : "${NIX_S3_BUCKET:?must be set}"
-  : "${APP_NAME:?must be set - determines name of closure file}"
+  : "${NIX_APP_NAME:?must be set - determines name of closure file}"
   # TODO add warning if NIX_VERSION is not set
   ## Add our own variables
   # Default the Nix version to 1.10 unless one has been specified
@@ -78,7 +78,7 @@ setup_variables() {
   # Nix installation script needs this
   export USER=$(whoami)
   # The name of the closure file fetched/stored from/in S3
-  export CLOSURE_NAME=${APP_NAME}.closure
+  export CLOSURE_NAME=${NIX_APP_NAME}.closure
   export CLOSURE=/tmp/$CLOSURE_NAME
 }
 
