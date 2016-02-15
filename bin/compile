@@ -13,7 +13,7 @@ source $DIR/common
 setup_variables $ENV_DIR
 
 # Sets up the scripts we'll need and creates config files
-source $DIR/setup-environment.sh
+source $DIR/setup-environment
 
 # Check if we've got a cached copy of Nix and download it if we don't
 if [ -d "$NIX_ROOT_CACHE_PATH" ]; then
