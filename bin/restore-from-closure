@@ -3,19 +3,9 @@
 DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 source $DIR/common
 
-# Heroku provides environment variables as files so we can be selective about
-# what we expose and what we hide. Export the ones we need using a helper
-# function.
-setup_variables $ENV_DIR
-
-# Make sure Nix installs things to the right place since we don't exactly have
-# a real HOME
-export HOME=$NIX_MNT
+# Hook up Nix
 source $HOME/.nix-profile/etc/profile.d/nix.sh
 export PATH=$HOME/.nix-profile/bin:$PATH
-
-topic "Downloading closure"
-try_download_closure
 
 if [ ! -e $CLOSURE ]; then
   topic "Closure not found; skipping"
@@ -39,14 +29,4 @@ else
   rm -rf /nix/var/nix/gcroots/*
   ln -s $out /nix/var/nix/gcroots/$(basename $out)
   nix-collect-garbage --option gc-keep-derivations false -d >/dev/null 2>&1
-
-  # Copy all our Nix stuff (including the store) to BUILD_DIR so it can be
-  # accessed by the running app.
-  topic "Copying Nix to BUILD_DIR, excluding patterns in .slugexclude"
-  mkdir -p $BUILD_DIR/nix-mnt
-  # Make sure the rsync exclude file at least exists or we'll get errors
-  touch $BUILD_DIR/.slugexclude
-  # Then copy everything over, minus the exclude patterns from .slugexclude
-  rsync -a --exclude-from=$BUILD_DIR/.slugexclude $NIX_MNT/ $BUILD_DIR/nix-mnt
-
 fi

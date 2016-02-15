@@ -12,11 +12,8 @@ source $DIR/common
 # function.
 setup_variables $ENV_DIR
 
-# We need proot for working with Nix and AWS for caching/restoring our Nix
-# binaries.
-mkdir -p $CACHE_DIR/bin
-download_and_install $CACHE_DIR $BUILD_DIR proot http://static.proot.me/proot-x86_64
-download_and_install $CACHE_DIR $BUILD_DIR aws https://raw.githubusercontent.com/timkay/aws/master/aws
+# Sets up the scripts we'll need and creates config files
+source $DIR/setup-environment.sh
 
 # Check if we've got a cached copy of Nix and download it if we don't
 if [ -d "$NIX_ROOT_CACHE_PATH" ]; then
@@ -32,19 +29,31 @@ else
   rm $NIX_TARBALL
 fi
 
-topic "Copying nix to $NIX_ROOT_PATH"
+# Copy Nix over to the tmp path so that our cached copy is always just the bare
+# minimum Nix needs to run. It's our S3 closure that'll contain all the extra
+# stuff for our app.
+topic "Copying Nix to $NIX_ROOT_PATH"
 mkdir -p $NIX_ROOT_PATH
 rsync -a $NIX_ROOT_CACHE_PATH/ $NIX_ROOT_PATH
 
 # Install Nix
-$BUILD_DIR/bin/proot -b $NIX_ROOT_PATH:/nix $DIR/setup-nix
+install_nix
 
 # TODO build instead if we have NIX_BUILD_ON_PUSH
 # Attempt to restore the project from the stored closure (if present)
+topic "Downloading closure"
+try_download_closure
 $BUILD_DIR/bin/proot -b $NIX_ROOT_PATH:/nix $DIR/restore-from-closure
+# Copy all our Nix stuff (including the store) to BUILD_DIR so it can be
+# accessed by the running app.
+topic "Copying Nix to BUILD_DIR, excluding patterns in .slugexclude"
+mkdir -p $BUILD_DIR/nix-mnt
+# Make sure the rsync exclude file at least exists or we'll get errors
+touch $BUILD_DIR/.slugexclude
+# Then copy everything over, minus the exclude patterns from .slugexclude
+rsync -a --exclude-from=$BUILD_DIR/.slugexclude $NIX_MNT/ $BUILD_DIR/nix-mnt
 
-# COPY TO NIX_DIR
-
+# Final instructions for the user
 if [ -z "${NIX_BUILD_ON_PUSH:-}" ] && [ ! -e /tmp/closure.log ]; then
   topic "Build environment set up."
   echo "To finish building, run:" | indent
