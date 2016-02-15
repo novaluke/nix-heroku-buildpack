@@ -170,3 +170,8 @@ packages that it needs. Although the packages in BUILD_DIR get pruned by
 `.slugexclude` we don't filter the packages in the closure saved to S3 - if we
 did, we'd have to redownload them all next time we built the app, since there's
 a difference between what the app needs to run and what Nix needs to build it.
+
+## Credits
+
+Heavily based on
+[corajr/heroku-buildpack-nix-proot](https://github.com/corajr/heroku-buildpack-nix-proot).
