@@ -9,10 +9,9 @@ source $DIR/common
 # it ourselves.
 if [ -z "$BUILD_DIR" ]; then
   export BUILD_DIR=/app
-  # Heroku provides environment variables as files so we can be selective about
-  # what we expose and what we hide. Export the ones we need using a helper
-  # function.
-  export_env_dir $ENV_DIR
+  # No ENV_DIR since in a one-off dyno they're actually available as environment
+  # variables.
+  setup_variables
 
   # Can't restore from cache since we can't access cache in one-off repo
   topic "Downloading Nix"

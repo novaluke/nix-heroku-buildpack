@@ -10,7 +10,7 @@ source $DIR/common
 # Heroku provides environment variables as files so we can be selective about
 # what we expose and what we hide. Export the ones we need using a helper
 # function.
-export_env_dir $ENV_DIR
+setup_variables $ENV_DIR
 
 # We need proot for working with Nix and AWS for caching/restoring our Nix
 # binaries.
