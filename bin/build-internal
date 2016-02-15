@@ -9,9 +9,11 @@ export PATH=$HOME/.nix-profile/bin:$PATH
 if [ -e $CLOSURE ]; then
   topic "Closure found; importing."
   nix-store --import < $CLOSURE | tee /tmp/closure.log | indent
+else
+  topic "WARNING: No closure found; build will start from scratch!"
 fi
 
-topic "Building..."
+topic "Building with build flags \`$NIX_BUILD_FLAGS\`"
 nix-build --cores 0 $NIX_BUILD_FLAGS -o $BUILD_DIR/result $BUILD_DIR/default.nix 2>&1 | indent
 
 topic "Storing application closure"
