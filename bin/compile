@@ -39,11 +39,20 @@ rsync -a $NIX_ROOT_CACHE_PATH/ $NIX_ROOT_PATH
 # Install Nix
 install_nix
 
-# TODO build instead if we have NIX_BUILD_ON_PUSH
-# Attempt to restore the project from the stored closure (if present)
+# Restore or build phase
 topic "Downloading closure"
 try_download_closure
-$BUILD_DIR/bin/proot -b $NIX_ROOT_PATH:/nix $DIR/restore-from-closure
+if [ -n "$NIX_BUILD_ON_PUSH" ]; then
+  topic "NIX_BUILD_ON_PUSH set; starting build"
+  source $DIR/build
+elif [ -e $CLOSURE ]; then # No NIX_BUILD_ON_PUSH but we do have a closure
+  topic "NIX_BUILD_ON_PUSH not set; restoring from closure"
+  # Restore the project from the stored closure
+  $BUILD_DIR/bin/proot -b $NIX_ROOT_PATH:/nix $DIR/restore-from-closure
+else # No NIX_BUILD_ON_PUSH *OR* closure
+  topic "Closure not found and NIX_BUILD_ON_PUSH not set; skipping app installation"
+fi
+
 # Copy all our Nix stuff (including the store) to BUILD_DIR so it can be
 # accessed by the running app.
 topic "Copying Nix to BUILD_DIR, excluding patterns in .slugexclude"

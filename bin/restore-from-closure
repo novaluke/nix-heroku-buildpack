@@ -7,26 +7,21 @@ source $DIR/common
 source $HOME/.nix-profile/etc/profile.d/nix.sh
 export PATH=$HOME/.nix-profile/bin:$PATH
 
-if [ ! -e $CLOSURE ]; then
-  topic "Closure not found; skipping"
-else
-  topic "Closure found; importing"
-  nix-store --import < $CLOSURE | tee /tmp/closure.log | indent
-  # Get the result path of the primary derivation for the app. If my theory is
-  # correct, it will always be the last thing to be imported since it's at the
-  # base of the dependency tree, but without confirmation from the Nix team this
-  # is hacky and brittle.
-  # TODO either confirm this is correct or find a better way
-  out=$(tail -1 /tmp/closure.log)
+nix-store --import < $CLOSURE | tee /tmp/closure.log | indent
+# Get the result path of the primary derivation for the app. If my theory is
+# correct, it will always be the last thing to be imported since it's at the
+# base of the dependency tree, but without confirmation from the Nix team this
+# is hacky and brittle.
+# TODO either confirm this is correct or find a better way
+out=$(tail -1 /tmp/closure.log)
 
-  topic "Project restored from previous build to $out"
-  echo "Symlinking to result/" | indent
-  # Symlink to the built project so it can be referenced from the Procfile
-  ln -s $out $BUILD_DIR/result
+topic "Project restored from previous build to $out"
+echo "Symlinking to result/" | indent
+# Symlink to the built project so it can be referenced from the Procfile
+ln -s $out $BUILD_DIR/result
 
-  # Clear out any packages Nix has kept that aren't required by our package
-  topic "Clearing other packages"
-  rm -rf /nix/var/nix/gcroots/*
-  ln -s $out /nix/var/nix/gcroots/$(basename $out)
-  nix-collect-garbage --option gc-keep-derivations false -d >/dev/null 2>&1
-fi
+# Clear out any packages Nix has kept that aren't required by our package
+topic "Clearing other packages"
+rm -rf /nix/var/nix/gcroots/*
+ln -s $out /nix/var/nix/gcroots/$(basename $out)
+nix-collect-garbage --option gc-keep-derivations false -d >/dev/null 2>&1
